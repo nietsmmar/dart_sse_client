@@ -19,23 +19,20 @@ class _EventBuffer {
     String? id,
     String? event,
     String? data,
-  }) {
-    return _EventBuffer(
-      id: id ?? this.id,
-      event: event ?? this.event,
-      data: data ?? this.data,
-    );
-  }
+  }) =>
+      _EventBuffer(
+        id: id ?? this.id,
+        event: event ?? this.event,
+        data: data ?? this.data,
+      );
 
   /// Converts the buffer to a [MessageEvent].
-  MessageEvent toMessageEvent() {
-    /// [spec] If the data buffer's last character is a U+000A LINE FEED (LF) character, then remove the last character from the data buffer.
-    return MessageEvent(
-      id: id,
-      event: event,
-      data: data.endsWith('\n') ? data.substring(0, data.length - 1) : data,
-    );
-  }
+  /// [spec] If the data buffer's last character is a U+000A LINE FEED (LF) character, then remove the last character from the data buffer.
+  MessageEvent toMessageEvent() => MessageEvent(
+        id: id,
+        event: event,
+        data: data.endsWith('\n') ? data.substring(0, data.length - 1) : data,
+      );
 }
 
 enum ConnectionState { connected, connecting, disconnected }
@@ -223,14 +220,12 @@ class SseClient {
             eventBuffer = eventBuffer!.copyWith(
               event: fieldValue,
             );
-            return;
 
           /// [spec] Append the field value to the data buffer, then append a single U+000A LINE FEED (LF) character to the data buffer.
           case 'data':
             eventBuffer = eventBuffer!.copyWith(
               data: '${eventBuffer!.data}$fieldValue\n',
             );
-            return;
 
           /// [spec] If the field value does not contain U+0000 NULL, then set the last event ID buffer to the field value. Otherwise, ignore the field.
           case 'id':
@@ -239,7 +234,6 @@ class SseClient {
                 id: fieldValue,
               );
             }
-            return;
           case 'retry':
 
             /// [spec] If the field value consists of only ASCII digits, then interpret the field value as an integer in base ten,
@@ -247,7 +241,6 @@ class SseClient {
             if (_numericRegex.hasMatch(fieldValue)) {
               _reconnectionTime = int.parse(fieldValue);
             }
-            return;
         }
       })
         ..onDone(() {
@@ -257,7 +250,7 @@ class SseClient {
           _logger.severe('ERROR: server closed the connection.');
           streamController.close();
         })
-        ..onError((e, s) {
+        ..onError((Object e, StackTrace? s) {
           if (streamController.isClosed) {
             return;
           }

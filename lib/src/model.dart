@@ -1,4 +1,3 @@
-
 /// Message event dispatched by the SSE client.
 class MessageEvent {
   /// The last event id. It can be an empty string.
@@ -17,9 +16,7 @@ class MessageEvent {
   });
 
   @override
-  String toString() {
-    return 'MessageEvent{id: $id, event: $event, data: $data}';
-  }
+  String toString() => 'MessageEvent{id: $id, event: $event, data: $data}';
 
   @override
   bool operator ==(Object other) {
