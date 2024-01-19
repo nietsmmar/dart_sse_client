@@ -1,46 +1,52 @@
-## [0.0.2] - Migrated to null safety.
+## 3.0.0-dev
 
-* The package is now null safe
-* Unused imports have been removed
+* (TODO)
 
-## [0.0.3] - Added example for consuming a event.
+## 2.0.1
 
-* Added a example dart file for consuming the event
-* Refactored the code to remove redundancy
+* Updated http version to be compatible with the latest http package.
 
-## [0.0.4] - Refactored example
+## 2.0.0
 
-## [0.0.5] - Improved the stability
+* The request type can now be manually set.
+* Ability to pass the request body with the request.
+* Safe close of the sink added as well which was causing some minor crashes.
+* Stability changes in the model to handle null safety.
 
-* Fixed issue causing large responses to be split
-* Improved the way UTF8 Encoder was used
+## 2.0.0-beta.1
 
-## [0.0.6] - Fixed Stackoverflow exception
+* The request type can now be manually set.
+* Ability to pass the request body with the request.
+* Safe close of the sink added as well which was causing some minor crashes.
 
-* Fixed issue causing stackoverflow while loading large chunk data stream
+## 1.0.0
 
-## [0.1.0] - Improved documentation
+* Added ability to send custom headers.
+* Added error handling.
 
-* Added In-line documentation
+## 0.1.0
 
-## [1.0.0] - Custom header and error handling
+* Added In-line documentation.
 
-* Added ability to send custom headers
-* Added error handling
+## 0.0.6
 
-## [2.0.0-beta.1] - Ability to choose between GET and POST request and send a body with the request[BREAKING CHANGE]
+* Fixed issue causing stackoverflow while loading large chunk data stream.
 
-* The request type can now be manually set
-* Ability to pass the request body with the request
-* Safe close of the sink added as well which was causing some minor crashes
+## 0.0.5
 
-## [2.0.0] - Ability to choose between GET and POST request and send a body with the request[BREAKING CHANGE] and some additional code refactoring and bug fixes 
+* Fixed issue causing large responses to be split.
+* Improved the way UTF8 Encoder was used.
 
-* The request type can now be manually set
-* Ability to pass the request body with the request
-* Safe close of the sink added as well which was causing some minor crashes
-* Stability changes in the model to handle null safety
+## 0.0.4
 
-## [2.0.1] - Upgrading http version
+* Updated example code.
 
-* Updated http version to be compatible with the latest http package
+## 0.0.3
+
+* Added a example dart file for consuming the event.
+* Refactored the code to remove redundancy.
+
+## 0.0.2
+
+* The package is now null safe.
+* Unused imports have been removed.

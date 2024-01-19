@@ -1,4 +1,4 @@
-# Flutter Client SSE
+# SSE Client for Dart
 
 Dart package to help consume Server Sent Events
 
