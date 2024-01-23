@@ -407,7 +407,6 @@ class AutoReconnectSseClient extends SseClient {
         print('Not retrying');
         _outerStreamController!.addError(error, stackTrace);
         close();
-        throw error;
       } else {
         // We'll retry. only close the super class instance, so that the outer stream is not affected.
         print('retrying');
