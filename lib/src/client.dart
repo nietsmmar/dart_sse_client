@@ -281,11 +281,41 @@ class SseClient {
   }
 }
 
-enum ConnectionError { streamEndedPrematurely, connectionFailed, errorEmitted }
+enum ConnectionError {
+  /// Indicates that the server closed the connection prematurely.
+  streamEndedPrematurely,
 
+  /// Indicates that the connection had failed.
+  connectionFailed,
+
+  /// Indicates that an error was emitted from the stream.
+  errorEmitted
+}
+
+/// A callback which expects to return a [ReconnectStrategy].
+/// If the callback returns null, the client will not retry reconnecting to the server, and the error will be
+/// emitted to the outer stream.
 typedef ReconnectStrategyCallback = ReconnectStrategy? Function(
-    ConnectionError errorType, int retryCount, int? reconnectionTime, Object error, StackTrace stacktrace);
 
+    /// The type of the connection error. See [ConnectionError].
+    ConnectionError errorType,
+
+    /// The number of times the connection has been retried (excluding the current attempt).
+    /// Starts from 0.
+    int retryCount,
+
+    /// The reconnection time specified by the server, if any.
+    int? reconnectionTime,
+
+    /// The error object.
+    Object error,
+
+    /// The stack trace of the error.
+    StackTrace stacktrace);
+
+/// A client that will automatically reconnect to the server when the connection is lost.
+/// This is separated from [SseClient] because of the different behavior or the [connect] method.
+/// See [connect] for more information.
 class AutoReconnectSseClient extends SseClient {
   /// The number of times a request should be retried.
   final int _retries;
@@ -306,20 +336,29 @@ class AutoReconnectSseClient extends SseClient {
     super.timeout = _defaultTimeout,
     super.onConnected,
     super.setContentTypeHeader = true,
+
+    /// The number of times a request should be retried.
     required int retries,
+
+    /// The callback to determine the retry strategy. See [ReconnectStrategyCallback].
     required ReconnectStrategyCallback onError,
     void Function()? onRetry,
   })  : _retries = retries,
         _onRetry = onRetry,
         _onError = onError;
 
-  /// The constructor parameters in this factory method are the same as [SseClient], so it can be seen as the drop-in
-  /// replacement of [SseClient], with added reconnection functionality.
+  /// A factory method to create an [AutoReconnectSseClient] instance with the default retry strategy.
+  ///
+  /// The constructor parameters in this factory method are the same as [SseClient], so it can be seen as a drop-in
+  /// replacement of [SseClient] constructor, with added reconnection functionality. The "default" behavior are as
+  /// follows:
   /// 1. It will try to reconnect for unlimited time, when a connection error or a stream error is emitted, or when the
   ///    server closes the connection prematurely.
-  /// 2. It will append the `Last-Event-ID` header to the request if the last event id is not null.
-  /// 3. It will acknowledge the retry duration specified by the SSE server if any and defaults to 500 milliseconds.
+  /// 2. It will append the `Last-Event-ID` header to the request if it is not null.
+  /// 3. It will acknowledge the retry duration specified by the SSE server if any, with a default of 500 milliseconds.
   /// 4. It will retry with exponential backoff.
+  ///
+  /// You should still be aware of the difference on [connect] method's behavior.
   ///
   /// Constructor the [AutoReconnectSseClient] instance manually if you need more control over the retry strategy and
   /// the number of retries.
@@ -351,9 +390,12 @@ class AutoReconnectSseClient extends SseClient {
     super.close();
   }
 
-  /// In a reconnecting SSE client, the difference is that it will holds an "outer event stream" object that will
-  /// always be returned to the user. The user can't determine if the connection is successful by just awaiting
-  /// for the stream. Instead, the user should listen to the stream and handle errors.
+  /// Connects to the server and returns a stream of [MessageEvent]s.
+  ///
+  /// Besides the auto-reconnect capability, the main difference between this method and [SseClient.connect] is that
+  /// this method will hold an "outer event stream" object that will always be returned to the user before attempting
+  /// a connection. Thus, user cannot determine if the connection is successful by just awaiting for the stream.
+  /// Instead, do it with the [onConnect] callback.
   @override
   Future<Stream<MessageEvent>> connect() async {
     if (_state != ConnectionState.disconnected) {
@@ -366,33 +408,34 @@ class AutoReconnectSseClient extends SseClient {
   }
 
   Future<void> _doConnect(int retryCount) async {
-    print('_doConnect() looping');
     bool didConnect = false;
     try {
-      print('connecting');
+      // Start connection to the server.
       var innerStream = await super.connect();
       didConnect = true;
+
+      // Propagate the events to the outer stream.
       await for (final event in innerStream) {
-        print('waiting form stream');
         if (_outerStreamController == null || _outerStreamController!.isClosed) {
           return;
         }
         _outerStreamController!.add(event);
       }
 
+      // The inner stream is closed. This means that the server has closed the connection.
       if (_outerStreamController == null || _outerStreamController!.isClosed) {
-        print('Disconnected---don\'t retry');
+        // No need to retry if the outer stream is closed.
         return;
       }
 
+      // Otherwise, the server has closed the connection prematurely.
       throw UnexpectedStreamDoneException('The server event stream is closed.');
     } catch (error, stackTrace) {
-      print('failed: $error}');
       if (_outerStreamController == null || _outerStreamController!.isClosed) {
-        print('Disconnected, don\'t retry');
         return;
       }
 
+      // Ask the callback for the retry strategy.
       _lastRetryStrategy = _onError(
           didConnect
               ? (error is UnexpectedStreamDoneException
@@ -404,12 +447,12 @@ class AutoReconnectSseClient extends SseClient {
           error,
           stackTrace);
       if (retryCount == _retries || _lastRetryStrategy == null) {
-        print('Not retrying');
+        // We've reached the retry limit, or the callback returned null.
+        // Emit an error to the outer stream and close it.
         _outerStreamController!.addError(error, stackTrace);
         close();
       } else {
-        // We'll retry. only close the super class instance, so that the outer stream is not affected.
-        print('retrying');
+        // Retry with the strategy returned by the callback.
         super.close();
         await Future<void>.delayed(_lastRetryStrategy!.delay);
         _onRetry?.call();
