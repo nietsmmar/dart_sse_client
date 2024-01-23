@@ -29,11 +29,15 @@ class MessageEvent {
   int get hashCode => id.hashCode ^ event.hashCode ^ data.hashCode;
 }
 
-class ReconnectStrategy {
+/// The strategy of retrying the connection.
+class RetryStrategy {
+  /// The delay before the next retry.
   final Duration delay;
+
+  /// Whether to append the `Last-Event-ID` header to the request.
   final bool appendLastIdHeader;
 
-  const ReconnectStrategy({
+  const RetryStrategy({
     required this.delay,
     this.appendLastIdHeader = true,
   });

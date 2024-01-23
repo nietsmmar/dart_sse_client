@@ -292,10 +292,10 @@ enum ConnectionError {
   errorEmitted
 }
 
-/// A callback which expects to return a [ReconnectStrategy].
+/// A callback which expects to return a [RetryStrategy].
 /// If the callback returns null, the client will not retry reconnecting to the server, and the error will be
 /// emitted to the outer stream.
-typedef ReconnectStrategyCallback = ReconnectStrategy? Function(
+typedef ReconnectStrategyCallback = RetryStrategy? Function(
 
     /// The type of the connection error. See [ConnectionError].
     ConnectionError errorType,
@@ -327,7 +327,7 @@ class AutoReconnectSseClient extends SseClient {
   StreamController<MessageEvent>? _outerStreamController;
 
   /// The last retry strategy.
-  ReconnectStrategy? _lastRetryStrategy;
+  RetryStrategy? _lastRetryStrategy;
 
   AutoReconnectSseClient(
     super._request, {
@@ -438,7 +438,7 @@ class AutoReconnectSseClient extends SseClient {
 
       // Define the callback to get the retry strategy and set it to the [_lastRetryStrategy] variable, so that
       // _onError() won't be called if the retry count has reached the limit.
-      ReconnectStrategy? getLastRetryStrategy() => _lastRetryStrategy = _onError(
+      RetryStrategy? getLastRetryStrategy() => _lastRetryStrategy = _onError(
           didConnect
               ? (error is UnexpectedStreamDoneException
                   ? ConnectionError.streamEndedPrematurely
@@ -469,8 +469,7 @@ class AutoReconnectSseClient extends SseClient {
 const _defaultTimeout = const Duration(seconds: 15);
 
 final _defaultStrategyCallback =
-    (ConnectionError errorType, int retryCount, int? reconnectionTime, Object obj, StackTrace stack) =>
-        ReconnectStrategy(
-          delay: Duration(milliseconds: reconnectionTime ?? 500) * math.pow(1.5, retryCount),
+    (ConnectionError errorType, int retryCount, int? reconnectionTime, Object obj, StackTrace stack) => RetryStrategy(
+          delay: Duration(milliseconds: reconnectionTime ?? 500) * math.pow(1.5, math.min(10, retryCount)),
           appendLastIdHeader: true,
         );

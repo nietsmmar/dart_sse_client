@@ -2,13 +2,13 @@ import 'package:http/http.dart' as http;
 import 'package:sse_client/sse_client.dart';
 
 Future<void> main() async {
-  // Create a SSE client.
+  // Create an SSE client.
   var sseClient = SseClient(
     http.Request('GET', Uri.parse('http://192.168.1.2:3000/api/activity-stream?historySnapshot=FIVE_MINUTE'))
       ..headers.addAll({
-        "Cookie":
+        'Cookie':
             'jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6InRlc3QiLCJpYXQiOjE2NDMyMTAyMzEsImV4cCI6MTY0MzgxNTAzMX0.U0aCAM2fKE1OVnGFbgAU_UVBvNwOMMquvPY8QaLD138; Path=/; Expires=Wed, 02 Feb 2022 15:17:11 GMT; HttpOnly; SameSite=Strict',
-        "Cache-Control": "no-cache",
+        'Cache-Control': 'no-cache',
       }),
   );
 
@@ -23,7 +23,7 @@ Future<void> main() async {
       print('Data: ' + event.data);
     })
       ..onError(
-        (error) {
+        (Object error) {
           print('Error: $error');
         },
       )
@@ -35,4 +35,5 @@ Future<void> main() async {
   }
 
   // Use `sseClient.close()` to close the connection.
+  sseClient.close();
 }

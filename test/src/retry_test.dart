@@ -33,7 +33,7 @@ void main() {
       onConnected: expectAsync0(() {
         expect(retryCount, 3);
       }),
-      onError: (errorType, retryCount, reconnectionTime, error, stacktrace) => ReconnectStrategy(
+      onError: (errorType, retryCount, reconnectionTime, error, stacktrace) => RetryStrategy(
         delay: const Duration(milliseconds: 1),
         appendLastIdHeader: false,
       ),
@@ -66,7 +66,7 @@ void main() {
         onError: expectAsync5((errorType, retryCount, reconnectionTime, error, stacktrace) {
           expect(retryCount, 0);
           expect(errorType, ConnectionError.streamEndedPrematurely);
-          return ReconnectStrategy(
+          return RetryStrategy(
             delay: Duration.zero,
             appendLastIdHeader: false,
           );
@@ -103,7 +103,7 @@ void main() {
         onError: (errorType, retryCount, reconnectionTime, error, stacktrace) {
           expect(retryCount, 0);
           expect(errorType, ConnectionError.errorEmitted);
-          return ReconnectStrategy(
+          return RetryStrategy(
             delay: const Duration(milliseconds: 1),
             appendLastIdHeader: false,
           );
@@ -140,7 +140,7 @@ void main() {
       onConnected: expectAsync0(() {}, count: 0),
       maxRetries: 3,
       onError: expectAsync5(
-          (errorType, retryCount, reconnectionTime, error, stacktrace) => ReconnectStrategy(
+          (errorType, retryCount, reconnectionTime, error, stacktrace) => RetryStrategy(
                 delay: Duration.zero,
               ),
           count: 3),
@@ -188,7 +188,7 @@ void main() {
       onRetry: expectAsync0(() {
         retryCount++;
       }),
-      onError: (errorType, retryCount, reconnectionTime, error, stacktrace) => ReconnectStrategy(
+      onError: (errorType, retryCount, reconnectionTime, error, stacktrace) => RetryStrategy(
         delay: Duration.zero,
       ),
     )..connect();
@@ -227,7 +227,7 @@ void main() {
       onRetry: () {
         retryCount++;
       },
-      onError: (errorType, retryCount, reconnectionTime, error, stacktrace) => ReconnectStrategy(
+      onError: (errorType, retryCount, reconnectionTime, error, stacktrace) => RetryStrategy(
         delay: Duration.zero,
         appendLastIdHeader: false,
       ),
