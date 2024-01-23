@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:async/async.dart';
 import 'package:http/http.dart' as http;
 import 'package:logging/logging.dart';
 
-import 'model.dart';
+import 'exceptions.dart';
+import 'models.dart';
 
 /// Internal buffer for SSE events.
 class _EventBuffer {
@@ -76,7 +78,7 @@ class SseClient {
   SseClient(this._request,
       {this.httpClientProvider,
       this.name = 'SseClient',
-      this.timeout = const Duration(seconds: 15),
+      this.timeout = _defaultTimeout,
       this.onConnected,
       this.setContentTypeHeader = true})
       : _logger = Logger(name),
@@ -278,3 +280,151 @@ class SseClient {
     _client = null;
   }
 }
+
+enum ConnectionError { streamEndedPrematurely, connectionFailed, errorEmitted }
+
+typedef ReconnectStrategyCallback = ReconnectStrategy? Function(
+    ConnectionError errorType, int retryCount, int? reconnectionTime, Object error, StackTrace stacktrace);
+
+class AutoReconnectSseClient extends SseClient {
+  /// The number of times a request should be retried.
+  final int _retries;
+
+  /// The callback to determine the retry strategy.
+  final ReconnectStrategyCallback _onError;
+
+  final void Function()? _onRetry;
+  StreamController<MessageEvent>? _outerStreamController;
+
+  /// The last retry strategy.
+  ReconnectStrategy? _lastRetryStrategy;
+
+  AutoReconnectSseClient(
+    super._request, {
+    super.httpClientProvider,
+    super.name,
+    super.timeout = _defaultTimeout,
+    super.onConnected,
+    super.setContentTypeHeader = true,
+    required int retries,
+    required ReconnectStrategyCallback onError,
+    void Function()? onRetry,
+  })  : _retries = retries,
+        _onRetry = onRetry,
+        _onError = onError;
+
+  /// The constructor parameters in this factory method are the same as [SseClient], so it can be seen as the drop-in
+  /// replacement of [SseClient], with added reconnection functionality.
+  /// 1. It will try to reconnect for unlimited time, when a connection error or a stream error is emitted, or when the
+  ///    server closes the connection prematurely.
+  /// 2. It will append the `Last-Event-ID` header to the request if the last event id is not null.
+  /// 3. It will acknowledge the retry duration specified by the SSE server if any and defaults to 500 milliseconds.
+  /// 4. It will retry with exponential backoff.
+  ///
+  /// Constructor the [AutoReconnectSseClient] instance manually if you need more control over the retry strategy and
+  /// the number of retries.
+  AutoReconnectSseClient.defaultStrategy(super._request,
+      {super.httpClientProvider,
+      super.name,
+      super.timeout = _defaultTimeout,
+      super.onConnected,
+      super.setContentTypeHeader = true,
+      int retries = -1,
+      void Function()? onRetry})
+      : _retries = retries,
+        _onError = _defaultStrategyCallback,
+        _onRetry = onRetry;
+
+  @override
+  http.StreamedRequest _copyRequest() {
+    var copiedRequest = super._copyRequest();
+    if ((_lastRetryStrategy?.appendLastIdHeader ?? false) && lastEventId != null) {
+      copiedRequest.headers['Last-Event-ID'] = lastEventId!;
+    }
+    return copiedRequest;
+  }
+
+  @override
+  void close() {
+    print('Disconnecting');
+    _outerStreamController?.close();
+    super.close();
+  }
+
+  /// In a reconnecting SSE client, the difference is that it will holds an "outer event stream" object that will
+  /// always be returned to the user. The user can't determine if the connection is successful by just awaiting
+  /// for the stream. Instead, the user should listen to the stream and handle errors.
+  @override
+  Future<Stream<MessageEvent>> connect() async {
+    if (_state != ConnectionState.disconnected) {
+      throw Exception('Already connected or connecting to SSE');
+    }
+
+    _outerStreamController = StreamController<MessageEvent>();
+    _doConnect(0);
+    return _outerStreamController!.stream;
+  }
+
+  Future<void> _doConnect(int retryCount) async {
+    print('_doConnect() looping');
+    bool didConnect = false;
+    try {
+      print('connecting');
+      var innerStream = await super.connect();
+      didConnect = true;
+      await for (final event in innerStream) {
+        print('waiting form stream');
+        if (_outerStreamController == null || _outerStreamController!.isClosed) {
+          return;
+        }
+        _outerStreamController!.add(event);
+      }
+
+      if (_outerStreamController == null || _outerStreamController!.isClosed) {
+        print('Disconnected---don\'t retry');
+        return;
+      }
+
+      throw UnexpectedStreamDoneException('The server event stream is closed.');
+    } catch (error, stackTrace) {
+      print('failed: $error}');
+      if (_outerStreamController == null || _outerStreamController!.isClosed) {
+        print('Disconnected, don\'t retry');
+        return;
+      }
+
+      _lastRetryStrategy = _onError(
+          didConnect
+              ? (error is UnexpectedStreamDoneException
+                  ? ConnectionError.streamEndedPrematurely
+                  : ConnectionError.errorEmitted)
+              : ConnectionError.connectionFailed,
+          retryCount,
+          reconnectionTime,
+          error,
+          stackTrace);
+      if (retryCount == _retries || _lastRetryStrategy == null) {
+        print('Not retrying');
+        _outerStreamController!.addError(error, stackTrace);
+        close();
+        throw error;
+      } else {
+        // We'll retry. only close the super class instance, so that the outer stream is not affected.
+        print('retrying');
+        super.close();
+        await Future<void>.delayed(_lastRetryStrategy!.delay);
+        _onRetry?.call();
+        _doConnect(retryCount + 1);
+      }
+    }
+  }
+}
+
+const _defaultTimeout = const Duration(seconds: 15);
+
+final _defaultStrategyCallback =
+    (ConnectionError errorType, int retryCount, int? reconnectionTime, Object obj, StackTrace stack) =>
+        ReconnectStrategy(
+          delay: Duration(milliseconds: reconnectionTime ?? 500) * math.pow(1.5, retryCount),
+          appendLastIdHeader: true,
+        );

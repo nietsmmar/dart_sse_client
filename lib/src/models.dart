@@ -28,3 +28,13 @@ class MessageEvent {
   @override
   int get hashCode => id.hashCode ^ event.hashCode ^ data.hashCode;
 }
+
+class ReconnectStrategy {
+  final Duration delay;
+  final bool appendLastIdHeader;
+
+  const ReconnectStrategy({
+    required this.delay,
+    this.appendLastIdHeader = true,
+  });
+}
