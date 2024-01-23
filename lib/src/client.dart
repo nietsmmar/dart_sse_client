@@ -317,8 +317,8 @@ typedef ReconnectStrategyCallback = ReconnectStrategy? Function(
 /// This is separated from [SseClient] because of the different behavior or the [connect] method.
 /// See [connect] for more information.
 class AutoReconnectSseClient extends SseClient {
-  /// The number of times a request should be retried.
-  final int _retries;
+  /// The number of times a reconnection should be tried.
+  final int _maxRetries;
 
   /// The callback to determine the retry strategy.
   final ReconnectStrategyCallback _onError;
@@ -337,13 +337,14 @@ class AutoReconnectSseClient extends SseClient {
     super.onConnected,
     super.setContentTypeHeader = true,
 
-    /// The number of times a request should be retried.
-    required int retries,
+    /// The number of times a request should be retried. Setting to -1 (or any negative value) will retry indefinitely,
+    /// which is the default.
+    int maxRetries = -1,
 
     /// The callback to determine the retry strategy. See [ReconnectStrategyCallback].
     required ReconnectStrategyCallback onError,
     void Function()? onRetry,
-  })  : _retries = retries,
+  })  : _maxRetries = maxRetries,
         _onRetry = onRetry,
         _onError = onError;
 
@@ -368,9 +369,9 @@ class AutoReconnectSseClient extends SseClient {
       super.timeout = _defaultTimeout,
       super.onConnected,
       super.setContentTypeHeader = true,
-      int retries = -1,
+      int maxRetries = -1,
       void Function()? onRetry})
-      : _retries = retries,
+      : _maxRetries = maxRetries,
         _onError = _defaultStrategyCallback,
         _onRetry = onRetry;
 
@@ -395,7 +396,7 @@ class AutoReconnectSseClient extends SseClient {
   /// Besides the auto-reconnect capability, the main difference between this method and [SseClient.connect] is that
   /// this method will hold an "outer event stream" object that will always be returned to the user before attempting
   /// a connection. Thus, user cannot determine if the connection is successful by just awaiting for the stream.
-  /// Instead, do it with the [onConnect] callback.
+  /// Instead, do it with the [onConnected] callback.
   @override
   Future<Stream<MessageEvent>> connect() async {
     if (_state != ConnectionState.disconnected) {
@@ -435,8 +436,9 @@ class AutoReconnectSseClient extends SseClient {
         return;
       }
 
-      // Ask the callback for the retry strategy.
-      _lastRetryStrategy = _onError(
+      // Define the callback to get the retry strategy and set it to the [_lastRetryStrategy] variable, so that
+      // _onError() won't be called if the retry count has reached the limit.
+      ReconnectStrategy? getLastRetryStrategy() => _lastRetryStrategy = _onError(
           didConnect
               ? (error is UnexpectedStreamDoneException
                   ? ConnectionError.streamEndedPrematurely
@@ -446,7 +448,9 @@ class AutoReconnectSseClient extends SseClient {
           reconnectionTime,
           error,
           stackTrace);
-      if (retryCount == _retries || _lastRetryStrategy == null) {
+
+      // Ask the callback for the retry strategy.
+      if (retryCount == _maxRetries || getLastRetryStrategy() == null) {
         // We've reached the retry limit, or the callback returned null.
         // Emit an error to the outer stream and close it.
         _outerStreamController!.addError(error, stackTrace);

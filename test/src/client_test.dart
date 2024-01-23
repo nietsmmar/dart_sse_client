@@ -10,7 +10,7 @@ void main() {
   setUp(() {});
   tearDown(() {});
 
-  test('test SSE client Connection', () async {
+  test('basic successful connection', () async {
     var client = SseClient(
       http.Request('GET', Uri.parse('http://example.com/subscribe')),
       httpClientProvider: () => MockClient((request) {
@@ -26,7 +26,7 @@ void main() {
     expect(await client.connect(), isA<Stream<MessageEvent>>());
   });
 
-  test('exception thrown on unexpected content type', () async {
+  test('exception should throw on unexpected content type', () async {
     var client = SseClient(
       http.Request('GET', Uri.parse('http://example.com/subscribe')),
       httpClientProvider: () => MockClient((request) {
@@ -43,30 +43,21 @@ void main() {
   });
 
   test('connect more than once', () async {
-    int connectSuccessCount = 0;
+    var client = SseClient(http.Request('POST', Uri.parse('http://example.com/subscribe'))..body = 'Hello World',
+        httpClientProvider: () => MockClient((request) {
+              // validate the request body is correct
+              expect(request.body, 'Hello World');
 
-    var client = SseClient(
-      http.Request('POST', Uri.parse('http://example.com/subscribe'))..body = 'Hello World',
-      httpClientProvider: () => MockClient((request) {
-        // validate the request body is correct
-        expect(request.body, 'Hello World');
-
-        return Future.value(http.Response('{"status": "ok"}', 200, headers: {
-          'content-type': 'text/event-stream',
-        }));
-      }),
-      onConnected: () {
-        connectSuccessCount++;
-      },
-    );
+              return Future.value(http.Response('{"status": "ok"}', 200, headers: {
+                'content-type': 'text/event-stream',
+              }));
+            }),
+        onConnected: expectAsync0(() {}, count: 2));
 
     await client.connect();
     client.close();
 
     await client.connect();
-    client.close();
-
-    expect(connectSuccessCount, 2);
   });
 
   test('cannot run connect again when connection is active', () async {
@@ -83,7 +74,7 @@ void main() {
     await expectLater(client.connect(), throwsA(isA<Exception>()));
   });
 
-  test('emitting event', () async {
+  test('should emit received event', () async {
     var client = SseClient(
       http.Request('GET', Uri.parse('http://example.com/subscribe')),
       httpClientProvider: () => MockClient.streaming((request, bodyStream) {
@@ -103,15 +94,12 @@ void main() {
     );
 
     var stream = await client.connect();
-    var completer = Completer<MessageEvent>();
-    stream.listen((event) {
-      completer.complete(event);
-    });
-
-    expect(await completer.future.timeout(const Duration(seconds: 5)),
-        const MessageEvent(event: 'test', data: '{"success": 200}', id: '3457'));
+    stream.listen(expectAsync1((event) {
+      expect(event, const MessageEvent(event: 'test', data: '{"success": 200}', id: '3457'));
+    }));
   });
 
+  // Testing message event parsing behavior as per https://html.spec.whatwg.org/multipage/server-sent-events.html .
   test('spec example 1', () async {
     var items = await _executeSseConnection(
       onSendData: (sink) {
@@ -123,7 +111,7 @@ void main() {
         return false;
       },
       expectedCount: 1,
-    ).timeout(const Duration(seconds: 5));
+    );
 
     expect(items[0], const MessageEvent(event: '', data: 'YHOO\n+2\n10', id: ''));
   });
@@ -148,7 +136,7 @@ void main() {
           ..add('\n'.codeUnits);
         return true; // Disconnect after sending the third event
       },
-    ).timeout(const Duration(seconds: 5));
+    );
     expect(items.length, 3);
     expect(items[0], const MessageEvent(event: '', data: 'first event', id: '1'));
     expect(items[1], const MessageEvent(event: '', data: 'second event', id: ''));
@@ -167,7 +155,7 @@ void main() {
           ..add('data:\n'.codeUnits);
         return true; // Disconnect after sending the third event
       },
-    ).timeout(const Duration(seconds: 5));
+    );
     expect(items.length, 2);
     expect(items[0], const MessageEvent(event: '', data: '', id: ''));
     expect(items[1], const MessageEvent(event: '', data: '\n', id: ''));
@@ -183,12 +171,13 @@ void main() {
           ..add('\n'.codeUnits);
         return true; // Disconnect after sending the third event
       },
-    ).timeout(const Duration(seconds: 5));
+    );
     expect(items.length, 2);
     expect(items[0], const MessageEvent(event: '', data: 'test', id: ''));
     expect(items[1], const MessageEvent(event: '', data: 'test', id: ''));
   });
 
+  // utf-8 character test
   test('utf8 test', () async {
     var items = await _executeSseConnection(
       onSendData: (sink) {
