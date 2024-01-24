@@ -4,7 +4,6 @@ import 'dart:math' as math;
 
 import 'package:async/async.dart';
 import 'package:http/http.dart' as http;
-import 'package:logging/logging.dart';
 
 import 'exceptions.dart';
 import 'models.dart';
@@ -43,9 +42,6 @@ final _numericRegex = RegExp(r'^\d+$');
 
 /// A client for connecting to a Server-Sent Events endpoint.
 class SseClient {
-  final Logger _logger;
-  final String name;
-
   /// A function that returns an [http.Client] instance. This is useful for testing and when you need to customize the
   /// client. If not specified, a default [http.Client] instance will be used.
   final http.Client Function()? httpClientProvider;
@@ -76,13 +72,8 @@ class SseClient {
   ConnectionState get state => _state;
 
   SseClient(this._request,
-      {this.httpClientProvider,
-      this.name = 'SseClient',
-      this.timeout = _defaultTimeout,
-      this.onConnected,
-      this.setContentTypeHeader = true})
-      : _logger = Logger(name),
-        assert(!_request.finalized) {
+      {this.httpClientProvider, this.timeout = _defaultTimeout, this.onConnected, this.setContentTypeHeader = true})
+      : assert(!_request.finalized) {
     _splitter = StreamSplitter(_request.finalize());
   }
 
@@ -130,7 +121,6 @@ class SseClient {
       throw Exception('Already connected or connecting to SSE');
     }
 
-    _logger.finest('Start subscribing to SSE: ${_request.url}');
     var streamController = StreamController<MessageEvent>();
 
     _state = ConnectionState.connecting;
@@ -156,7 +146,6 @@ class SseClient {
         throw Exception('Failed subscribing to SSE - unexpected Content-Type ${response.headers['content-type']}');
       }
     } catch (error) {
-      _logger.severe('SSE request response error: $error');
       rethrow;
     }
 
@@ -249,18 +238,15 @@ class SseClient {
           if (streamController.isClosed) {
             return;
           }
-          _logger.severe('ERROR: server closed the connection.');
           streamController.close();
         })
         ..onError((Object e, StackTrace? s) {
           if (streamController.isClosed) {
             return;
           }
-          _logger.severe('ERROR: $e');
           streamController.addError(e, s);
         });
     } catch (error) {
-      _logger.severe('SSE Stream error: $error');
       rethrow;
     }
 
@@ -332,7 +318,6 @@ class AutoReconnectSseClient extends SseClient {
   AutoReconnectSseClient(
     super._request, {
     super.httpClientProvider,
-    super.name,
     super.timeout = _defaultTimeout,
     super.onConnected,
     super.setContentTypeHeader = true,
@@ -365,7 +350,6 @@ class AutoReconnectSseClient extends SseClient {
   /// the number of retries.
   AutoReconnectSseClient.defaultStrategy(super._request,
       {super.httpClientProvider,
-      super.name,
       super.timeout = _defaultTimeout,
       super.onConnected,
       super.setContentTypeHeader = true,
