@@ -1,9 +1,21 @@
+# A note from the fork author
+
+This is a fork of the original [flutter_client_sse](https://github.com/pratikbaid3/flutter_client_sse) package. I made
+some big changes, fixed some issues and added some features, and is waiting for the original author's response about my
+changes. In the meantime, if you want to try this package, you can add the following import to the `pubspec.yaml` file:
+
+```yaml
+dart_sse_client:
+  git:
+    url: https://github.com/tamcy/dart_sse_client/
+    ref: tamcy-dev
+```
+
 # SSE Client (Dart)
 
-SSE Client is a Dart package that enables you to receive updates from a server using Server Sent Events. It helps you
-connect to a server that streams events using the text/event-stream MIME type, and provides a parsed representation of
-the event, id and the data fields.
-
+`dart_sse_client` is a Dart package that helps you to connect to a server using Server-Sent Events (SSE). SSE is a protocol
+that enables the server to push data to the client over a persistent HTTP connection. This package will parse the
+event stream and provide a parsed representation of the event, id and data fields.
 
 ## Getting Started
 
@@ -13,89 +25,95 @@ To use this package, add the following import to the `pubspec.yaml` file:
 
 ```yaml
 client_sse:
-    git:
-      url: https://github.com/pratikbaid3/flutter_client_sse
-      path:
+  git:
+    url: https://github.com/pratikbaid3/flutter_client_sse
+    path:
 ```
 
 ### Usage
 
+#### Single connecting client
+
 ```dart
 import 'package:http/http.dart' as http;
+import 'package:sse_client/sse_client.dart';
 
-/// Create the client.
-final client = SseClient(
-  /// Must supply a [Request] object. You can add all necessary headers here.  
-  http.Request('GET', Uri.parse('http://192.168.1.2:3000/api/activity-stream?historySnapshot=FIVE_MINUTE'))
-  ..headers.addAll({
-    'Authorization': 'Bearer (token)',
-    'Cache-Control': 'no-cache',
-  }),
+Future<void> main() async {
+  /// Create the client.
+  final client = SseClient(
 
-  /// You can supply a custom [http.HttpClient] provider. Useful if you want to use a custom [HttpClient] implementation.
-  /// If not supplied, the default [http.HttpClient] will be used. 
-  httpClientProvider: () => http.Client(),
-  
-  /// Connection timeout. The default is 15 seconds.
-  timeout: Duration(seconds: 15),
+    /// Must supply a [Request] object. You can add all necessary headers here.
+    http.Request('GET', Uri.parse('http://example.com/subscribe'))
+      ..headers.addAll({
+        'Authorization': 'Bearer (token)',
+        'Cache-Control': 'no-cache',
+      }),
 
-  /// Called when the connection is established.
-  onConnected: () {
-    print('Connected');
-  },
+    /// You can supply a custom [http.HttpClient] provider. Useful if you want to use a custom [HttpClient] implementation.
+    /// If not supplied, the default [http.HttpClient] will be used.
+    httpClientProvider: () => http.Client(),
 
-  /// Whether the class should add the "text/event-stream" content type header to the request. The default is `true`.
-  setContentTypeHeader: true,
-);
+    /// Connection timeout. The default is 15 seconds.
+    timeout: Duration(seconds: 15),
 
-/// Now you can connect to the server.
-try {
+    /// Called when the connection is established.
+    onConnected: () {
+      print('Connected');
+    },
+
+    /// Whether the class should add the "text/event-stream" content type header to the request. The default is `true`.
+    setContentTypeHeader: true,
+  );
+
+  /// Now you can connect to the server.
+  try {
     /// Connects to the server. Here we are using the `await` keyword to wait for the connection to be established.
     /// If the connection fails, an exception will be thrown.
     var stream = await client.connect();
-    
+
     /// Connection is successful, now listen to the stream.
     /// Connection will be closed when onError() or onDone() is called.
     stream.listen((event) {
       print('Id: ' + event.id);
       print('Event: ' + event.event);
       print('Data: ' + event.data);
-    })..onError((Object error) {
-      print('Error: $error');
-    })..onDone(() {
-      print('Disconnected by the server');
-    });
-} catch (e) {
-  print('Connection Error: $e');
-}
+    })
+      ..onError((Object error) {
+        print('Error: $error');
+      })
+      ..onDone(() {
+        print('Disconnected by the server');
+      });
+  } catch (e) {
+    print('Connection Error: $e');
+  }
 
-/// Closes the connection manually.
-sseClient.close();
+  /// Closes the connection manually.
+  client.close();
+}
 ```
 
-When using `SseClient`, developers are in full control on how to handle the connection failures. When `connect()` is
-called it returns a `Future`. The code will complete with an error when connection fails. After connecting to the server,
-you can use the `onError()` and `onDone()` callbacks to handle errors and disconnections.
+With `SseClient`, you have full control over how to handle connection failures. When you call `connect()`, it returns
+a `Future` that completes with an error if the connection fails. Once connected, you can use the `onError()` and
+`onDone()` callbacks to handle any errors or disconnections that occur.
 
-Alternately, you can use the `AutoReconnectSseClient` class to automatically reconnect to the server when connection
-fails or closes prematurely by the server. This class uses an exponential backoff algorithm to reconnect to the server.
-There is a `AutoReconnectSseClient.defaultStrategy` which can be used to create a client with default settings. The
-constructor parameters are just the same as `SseClient`, so you can just replace `SseClient` with
-`AutoReconnectSseClient.defaultStrategy` in the above example to use this class.
+#### Auto reconnecting client
 
-Do note that when using `AutoReconnectSseClient`, you must NOT rely on `await`-ing the `connect()` method to know when
-the connection is established, as the `connect()` method in `AutoReconnectSseClient` will return a stream immediately.
-Instead, you should use the `onConnected` callback, which is called every time a connection is established. Also,
-`AutoReconnectSseClient` will consume all errors and disconnections, so `onError()` and `onDone()` of the stream may
-not reflect what is happening with the actual connection (unless when e.g. the maximum retry number is reached and the
-error is propagated to the stream).
+If you want to automatically reconnect to the server when the connection is lost or closed by the server, you can use
+the `AutoReconnectSseClient` class. This class provides a default reconnection strategy that you can use by calling the
+`AutoReconnectSseClient.defaultStrategy` factory constructor. The parameters of this constructor are the same as
+`SseClient`, so you can easily switch from one to the other (note that the behavior of `connect()` is different,
+see below).
 
-More fine-grained control can be achieved by using the `AutoReconnectSseClient` class directly:
+Alternatively, you can customize the reconnection strategy by using the `AutoReconnectSseClient` class directly. For
+example, you can specify the maximum number of retries, the delay between retries, or the conditions for retrying.
 
 ```dart
+
 final client = AutoReconnectSseClient(
+
   /// Same as SseClient, see above.  
-  http.Request('GET', Uri.parse('http://192.168.1.2:3000/api/activity-stream?historySnapshot=FIVE_MINUTE'))
+  http.Request('GET', Uri.parse('http://example.com/subscribe'))
     ..headers.addAll({
       'Authorization': 'Bearer (token)',
       'Cache-Control': 'no-cache',
@@ -111,17 +129,30 @@ final client = AutoReconnectSseClient(
   /// The number of retry won't accumulate, it will reset every time a connection is successfully established.
   /// If the maximum number of retries is reached, the stream will close with an error. 
   maxRetries: -1,
-  
+
   /// Called when an error occurred and a reconnection is about to be made.
   /// The callback won't be called if the maximum number of retries is reached.
   /// If this callback returns `null`, no retry will be made, and the error will be propagated to the stream.
   /// Check the source code's `ReconnectStrategyCallback` typedef for details of the callback parameters.
-  onError: (errorType, retryCount, reconnectionTime, error, stacktrace) => RetryStrategy(
-      /// The delay before the next retry. By default it will acknowledge `reconnectionTime` with an exponential backoff.  
-      delay: Duration(seconds: 5),
+  onError: (errorType, retryCount, reconnectionTime, error, stacktrace) =>
+      RetryStrategy(
 
-      /// Whether to append the "Last ID"
-      appendLastIdHeader: true,
-  ),
+        /// The delay before the next retry. By default it will acknowledge `reconnectionTime` with an exponential backoff.  
+        delay: Duration(seconds: 5),
+
+        /// Whether to append the "Last ID"
+        appendLastIdHeader: true,
+      ),
 );
 ```
+
+#### Notes
+
+Note that when using `AutoReconnectSseClient`, you should not rely on `await`-ing the `connect()` method and catching
+errors thrown by it to see when the connection is successfully established, as it returns a stream immediately. Instead,
+use the `onConnected` callback, which is called every time a connection is made.
+
+Also, note that `AutoReconnectSseClient` will consume all “errors” and “done” events from the underlying connection(s)
+when a reconnection is attempted, so the `onError()` and `onDone()` callbacks of the outer stream may not reflect the
+actual connection status, unless the reconnection fails permanently (i.e. the maximum number of retry is reached of
+`onError` returns a `null`) and the error is propagated to the outer stream.
