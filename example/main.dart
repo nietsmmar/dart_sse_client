@@ -38,14 +38,17 @@ Future<void> main() async {
     /// Connection is successful, now listen to the stream.
     /// Connection will be closed when onError() or onDone() is called.
     stream.listen((event) {
-      print('Id: ' + event.id);
-      print('Event: ' + event.event);
-      print('Data: ' + event.data);
+      print('Id: ${event.id}');
+      print('Event: ${event.event}');
+      print('Data: ${event.data}');
     })
       ..onError((Object error) {
         print('Error: $error');
       })
       ..onDone(() {
+        /// This will not be called when the connection is closed by the client via [client.close()].
+        /// So, [onDone()] means the connection is closed by the server, which is usually not normal,
+        /// and a reconnection is probably needed.
         print('Disconnected by the server');
       });
   } catch (e) {
