@@ -23,7 +23,7 @@ void main() {
       }),
     );
 
-    expect(await client.connect(), isA<Stream<MessageEvent>>());
+    expect(client.connect(), completion(isA<Stream<MessageEvent>>()));
   });
 
   test('exception should throw on unexpected content type', () async {
@@ -93,10 +93,7 @@ void main() {
       }),
     );
 
-    var stream = await client.connect();
-    stream.listen(expectAsync1((event) {
-      expect(event, const MessageEvent(event: 'test', data: '{"success": 200}', id: '3457'));
-    }));
+    expect(await client.connect(), emits(const MessageEvent(event: 'test', data: '{"success": 200}', id: '3457')));
   });
 
   // Testing message event parsing behavior as per https://html.spec.whatwg.org/multipage/server-sent-events.html .

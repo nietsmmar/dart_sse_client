@@ -34,7 +34,7 @@ void main() {
         expect(retryCount, 3);
       }),
       onError: (errorType, retryCount, reconnectionTime, error, stacktrace) => RetryStrategy(
-        delay: const Duration(milliseconds: 1),
+        delay: Duration.zero,
         appendLastIdHeader: false,
       ),
     ).connect();
@@ -72,7 +72,7 @@ void main() {
           );
         })).connect();
 
-    expect(await completer.future, 1);
+    expect(completer.future, completion(equals(1)));
   });
 
   test('retry if error emitted', () async {
@@ -104,12 +104,12 @@ void main() {
           expect(retryCount, 0);
           expect(errorType, ConnectionError.errorEmitted);
           return RetryStrategy(
-            delay: const Duration(milliseconds: 1),
+            delay: Duration.zero,
             appendLastIdHeader: false,
           );
         }).connect();
 
-    expect(await completer.future, 1);
+    expect(completer.future, completion(equals(1)));
   });
 
   test('should not retry on client disconnection', () async {
@@ -118,11 +118,12 @@ void main() {
               var controller = StreamController<List<int>>();
               return _responseStreamOf(controller);
             }),
-        onConnected: expectAsync0(() {}),
+        onConnected: expectAsync0(() => RetryStrategy(
+              delay: Duration.zero,
+              appendLastIdHeader: false,
+            )),
         onRetry: expectAsync0(() {}, count: 0),
-        onError: expectAsync5((errorType, retryCount, reconnectionTime, error, stacktrace) {
-          fail('This should not be called');
-        }, count: 0))
+        onError: expectAsync5((errorType, retryCount, reconnectionTime, error, stacktrace) {}, count: 0))
       ..connect();
 
     await Future<void>.delayed(const Duration(milliseconds: 1));
@@ -131,7 +132,6 @@ void main() {
   });
 
   test('should not retry if retry more than retry count', () async {
-    final completer = Completer<void>();
     var client = AutoReconnectSseClient(
       http.Request('GET', Uri.parse('http://example.com/subscribe')),
       httpClientProvider: () =>
@@ -146,15 +146,7 @@ void main() {
           count: 3),
     );
 
-    try {
-      var stream = await client.connect();
-      await for (final _ in stream) {}
-    } catch (e) {
-      expect(e, isA<Exception>());
-      completer.complete();
-    }
-
-    await completer.future;
+    expect(await client.connect(), emitsError(isA<Exception>()));
   });
 
   test('should send last event ID by default', () async {
@@ -193,7 +185,7 @@ void main() {
       ),
     )..connect();
 
-    expect(await completer.future, 'b3457a');
+    expect(completer.future, completion(equals('b3457a')));
   });
 
   test('should not send last event ID if told not to', () async {
@@ -232,8 +224,7 @@ void main() {
         appendLastIdHeader: false,
       ),
     )..connect();
-
-    expect(await completer.future, false);
+    expect(completer.future, completion(equals(false)));
   });
 
   // test('should ack retry interval', () async {});
