@@ -80,7 +80,7 @@ void main() {
       httpClientProvider: () => MockClient.streaming((request, bodyStream) {
         var controller = StreamController<List<int>>();
 
-        Future.delayed(const Duration(seconds: 1), () {
+        Future.delayed(const Duration(milliseconds: 1), () {
           controller
             ..add('event: test\n'.codeUnits)
             ..add('data: {"success": 200}\n'.codeUnits)
@@ -200,7 +200,7 @@ Future<List<MessageEvent>> _executeSseConnection({
     httpClientProvider: () => MockClient.streaming((request, bodyStream) {
       var controller = StreamController<List<int>>();
 
-      Future.delayed(const Duration(seconds: 1), () {
+      Future.delayed(const Duration(milliseconds: 1), () {
         var shouldDisconnect = onSendData(controller.sink);
         if (shouldDisconnect) {
           controller.close();
