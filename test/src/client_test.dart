@@ -3,7 +3,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:sse_client/sse_client.dart';
+import 'package:dart_sse_client/sse_client.dart';
 import 'package:test/test.dart';
 
 void main() {

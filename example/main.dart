@@ -1,5 +1,5 @@
 import 'package:http/http.dart' as http;
-import 'package:sse_client/sse_client.dart';
+import 'package:dart_sse_client/sse_client.dart';
 
 Future<void> main() async {
   /// EXAMPLE 1: Single connecting client

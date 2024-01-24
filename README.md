@@ -13,9 +13,8 @@ dart_sse_client:
 
 # SSE Client (Dart)
 
-`dart_sse_client` is a Dart package that helps you to connect to a server using Server-Sent Events (SSE). SSE is a protocol
-that enables the server to push data to the client over a persistent HTTP connection. This package will parse the
-event stream and provide a parsed representation of the event, id and data fields.
+`dart_sse_client` is a Dart package that helps you to receive server-sent messages the using Server-Sent Events (SSE)
+mechanism. This package will parse the event stream and provide a parsed representation of the event, id and data fields.
 
 ## Getting Started
 
@@ -36,7 +35,7 @@ client_sse:
 
 ```dart
 import 'package:http/http.dart' as http;
-import 'package:sse_client/sse_client.dart';
+import 'package:dart_sse_client/sse_client.dart';
 
 Future<void> main() async {
   /// Create the client.
