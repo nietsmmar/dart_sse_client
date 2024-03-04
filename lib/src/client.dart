@@ -138,7 +138,7 @@ class SseClient {
 
       /// [spec] if res's status is not 200, or if res's `Content-Type` is not `text/event-stream`, then fail the connection.
       if (response.statusCode != 200) {
-        throw Exception('Failed subscribing to SSE - invalid response code ${response.statusCode}');
+        throw Exception(response.statusCode);
       }
 
       if (!response.headers.containsKey('content-type') ||
